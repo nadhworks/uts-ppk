@@ -2,7 +2,7 @@ package com.utsppk.bookingpa.controller;
 
 import com.utsppk.bookingpa.dto.request.CatatanKonsultasiRequest;
 import com.utsppk.bookingpa.dto.response.ApiResponse;
-import com.utsppk.bookingpa.model.Consultation;
+import com.utsppk.bookingpa.dto.response.ConsultationResponse;
 import com.utsppk.bookingpa.service.ConsultationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -28,10 +28,10 @@ public class ConsultationController {
 
     @PostMapping("/note")
     @PreAuthorize("hasRole('DOSEN')")
-    @Operation(summary = "Tambah catatan hasil konsultasi (Dosen)")
-    public ResponseEntity<ApiResponse<Consultation>> addConsultationNote(
+    @Operation(summary = "Menambah catatan hasil konsultasi (Dosen)")
+    public ResponseEntity<ApiResponse<ConsultationResponse>> addConsultationNote(
             @Valid @RequestBody CatatanKonsultasiRequest request) {
-        Consultation consultation = consultationService.addConsultationNote(request);
+        ConsultationResponse consultation = consultationService.addConsultationNote(request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(new ApiResponse<>(true, "Catatan hasil konsultasi berhasil ditambahkan", consultation));
@@ -39,17 +39,17 @@ public class ConsultationController {
 
     @GetMapping("/history")
     @PreAuthorize("hasRole('MAHASISWA')")
-    @Operation(summary = "Lihat riwayat konsultasi (Mahasiswa)")
-    public ResponseEntity<ApiResponse<List<Consultation>>> getMyConsultationHistory(
+    @Operation(summary = "Melihat riwayat konsultasi (Mahasiswa)")
+    public ResponseEntity<ApiResponse<List<ConsultationResponse>>> getMyConsultationHistory(
             Authentication authentication) {
-        List<Consultation> consultations = consultationService.getMyConsultationHistory(authentication.getName());
+        List<ConsultationResponse> consultations = consultationService.getMyConsultationHistory(authentication.getName());
         return ResponseEntity.ok(new ApiResponse<>(true, "Riwayat konsultasi ditemukan", consultations));
     }
 
     @GetMapping("/booking/{bookingId}")
-    @Operation(summary = "Lihat hasil konsultasi berdasarkan booking")
-    public ResponseEntity<ApiResponse<Consultation>> getConsultationByBooking(@PathVariable Long bookingId) {
-        Consultation consultation = consultationService.getConsultationByBooking(bookingId);
+    @Operation(summary = "Melihat hasil konsultasi berdasarkan booking")
+    public ResponseEntity<ApiResponse<ConsultationResponse>> getConsultationByBooking(@PathVariable Long bookingId) {
+        ConsultationResponse consultation = consultationService.getConsultationByBooking(bookingId);
         return ResponseEntity.ok(new ApiResponse<>(true, "Hasil konsultasi ditemukan", consultation));
     }
 }

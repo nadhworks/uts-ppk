@@ -1,6 +1,7 @@
 package com.utsppk.bookingpa.service;
 
 import com.utsppk.bookingpa.dto.request.CreateBookingRequest;
+import com.utsppk.bookingpa.dto.response.BookingResponse;
 import com.utsppk.bookingpa.exception.BadRequestException;
 import com.utsppk.bookingpa.exception.ResourceNotFoundException;
 import com.utsppk.bookingpa.exception.UnauthorizedException;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class BookingService {
@@ -30,20 +32,21 @@ public class BookingService {
     private UserRepository userRepository;
 
     @Transactional
-    public Booking createBooking(String username, CreateBookingRequest request) {
+    public BookingResponse createBooking(String username, CreateBookingRequest request) {
         User mahasiswa = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Mahasiswa tidak ditemukan"));
 
         Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Jadwal tidak ditemukan"));
 
-        // Check if slot is available
         if (schedule.getSlotTerisi() >= schedule.getMaxSlot()) {
             throw new BadRequestException("Slot sudah penuh");
         }
-
         if (!schedule.getAvailable()) {
             throw new BadRequestException("Jadwal tidak tersedia");
+        }
+        if (mahasiswa.getDosenPa() != null && !schedule.getDosen().getId().equals(mahasiswa.getDosenPa().getId())) {
+            throw new BadRequestException("Anda hanya bisa booking jadwal Dosen PA Anda.");
         }
 
         Booking booking = new Booking();
@@ -52,28 +55,37 @@ public class BookingService {
         booking.setStatus(Booking.BookingStatus.PENDING);
         booking.setKeterangan(request.getKeterangan());
 
-        return bookingRepository.save(booking);
+        Booking savedBooking = bookingRepository.save(booking);
+        return mapToBookingResponse(savedBooking);
     }
 
-    public List<Booking> getMyBookings(String username) {
+    @Transactional(readOnly = true)
+    public List<BookingResponse> getMyBookings(String username) {
         User mahasiswa = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Mahasiswa tidak ditemukan"));
 
-        return bookingRepository.findByMahasiswaId(mahasiswa.getId());
+        List<Booking> bookings = bookingRepository.findByMahasiswaId(mahasiswa.getId());
+        return bookings.stream()
+                .map(this::mapToBookingResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<Booking> getPendingBookings(String username) {
+    @Transactional(readOnly = true)
+    public List<BookingResponse> getPendingBookings(String username) {
         User dosen = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Dosen tidak ditemukan"));
 
-        return bookingRepository.findByScheduleDosenIdAndStatus(
+        List<Booking> bookings = bookingRepository.findByScheduleDosenIdAndStatus(
                 dosen.getId(),
                 Booking.BookingStatus.PENDING
         );
+        return bookings.stream()
+                .map(this::mapToBookingResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional
-    public Booking approveBooking(Long id) {
+    public BookingResponse approveBooking(Long id) {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking tidak ditemukan"));
 
@@ -84,16 +96,16 @@ public class BookingService {
         booking.setStatus(Booking.BookingStatus.APPROVED);
         booking.setApprovedAt(LocalDateTime.now());
 
-        // Update slot terisi
         Schedule schedule = booking.getSchedule();
         schedule.setSlotTerisi(schedule.getSlotTerisi() + 1);
         scheduleRepository.save(schedule);
 
-        return bookingRepository.save(booking);
+        Booking savedBooking = bookingRepository.save(booking);
+        return mapToBookingResponse(savedBooking);
     }
 
     @Transactional
-    public Booking rejectBooking(Long id) {
+    public BookingResponse rejectBooking(Long id) {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking tidak ditemukan"));
 
@@ -102,7 +114,8 @@ public class BookingService {
         }
 
         booking.setStatus(Booking.BookingStatus.REJECTED);
-        return bookingRepository.save(booking);
+        Booking savedBooking = bookingRepository.save(booking);
+        return mapToBookingResponse(savedBooking);
     }
 
     @Transactional
@@ -110,17 +123,47 @@ public class BookingService {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking tidak ditemukan"));
 
-        // Validasi 1: Pastikan ini milik mahasiswa yang login
         if (!booking.getMahasiswa().getUsername().equals(username)) {
             throw new UnauthorizedException("Anda tidak memiliki izin untuk menghapus booking ini");
         }
-
-        // Validasi 2: Pastikan statusnya PENDING
         if (booking.getStatus() != Booking.BookingStatus.PENDING) {
             throw new BadRequestException("Hanya permintaan yang PENDING yang bisa dihapus. Status saat ini: " + booking.getStatus());
         }
 
-        // Langsung hapus. Tidak perlu logika slot.
         bookingRepository.delete(booking);
+    }
+
+    private BookingResponse mapToBookingResponse(Booking booking) {
+        BookingResponse dto = new BookingResponse();
+        dto.setId(booking.getId());
+
+        if (booking.getMahasiswa() != null) {
+            dto.setMahasiswaId(booking.getMahasiswa().getId());
+            dto.setNamaMahasiswa(booking.getMahasiswa().getNama());
+            dto.setNimMahasiswa(booking.getMahasiswa().getNimNip());
+            dto.setEmailMahasiswa(booking.getMahasiswa().getEmail());
+        }
+
+        if (booking.getSchedule() != null) {
+            dto.setScheduleId(booking.getSchedule().getId());
+            dto.setHari(booking.getSchedule().getHari());
+            dto.setHariIndonesia(booking.getSchedule().getHari());
+            dto.setJamMulai(booking.getSchedule().getJamMulai());
+            dto.setJamSelesai(booking.getSchedule().getJamSelesai());
+            dto.setWaktuKonsultasi(booking.getSchedule().getJamMulai(), booking.getSchedule().getJamSelesai());
+
+            if (booking.getSchedule().getDosen() != null) {
+                dto.setDosenId(booking.getSchedule().getDosen().getId());
+                dto.setNamaDosen(booking.getSchedule().getDosen().getNama());
+            }
+        }
+
+        dto.setStatus(booking.getStatus());
+        dto.setStatusIndonesia(booking.getStatus());
+        dto.setKeterangan(booking.getKeterangan());
+        dto.setCreatedAt(booking.getCreatedAt());
+        dto.setApprovedAt(booking.getApprovedAt());
+
+        return dto;
     }
 }

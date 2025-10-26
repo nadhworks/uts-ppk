@@ -1,6 +1,7 @@
 package com.utsppk.bookingpa.service;
 
 import com.utsppk.bookingpa.dto.request.CreateScheduleRequest;
+import com.utsppk.bookingpa.dto.response.ScheduleResponse; // Import DTO
 import com.utsppk.bookingpa.exception.BadRequestException;
 import com.utsppk.bookingpa.exception.ResourceNotFoundException;
 import com.utsppk.bookingpa.model.Schedule;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ScheduleService {
@@ -25,7 +27,7 @@ public class ScheduleService {
     private UserRepository userRepository;
 
     @Transactional
-    public Schedule createSchedule(String username, CreateScheduleRequest request) {
+    public ScheduleResponse createSchedule(String username, CreateScheduleRequest request) { // Return DTO
         User dosen = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Dosen tidak ditemukan"));
 
@@ -35,37 +37,48 @@ public class ScheduleService {
         schedule.setJamMulai(LocalTime.parse(request.getJamMulai()));
         schedule.setJamSelesai(LocalTime.parse(request.getJamSelesai()));
         schedule.setMaxSlot(request.getMaxSlot());
-        schedule.setSlotTerisi(0);
-        schedule.setAvailable(true);
+        schedule.setSlotTerisi(0); // Inisialisasi slot terisi
+        schedule.setAvailable(true); // Inisialisasi available
 
-        return scheduleRepository.save(schedule);
+        Schedule savedSchedule = scheduleRepository.save(schedule);
+        return mapToScheduleResponse(savedSchedule); // Map ke DTO sebelum return
     }
 
-    public List<Schedule> getAvailableSchedules(String username) {
+    @Transactional(readOnly = true)
+    public List<ScheduleResponse> getAvailableSchedules(String username) { // Return List<DTO>
         User mahasiswa = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Mahasiswa tidak ditemukan"));
 
-        // 1. Ambil Dosen PA dari mahasiswa
+        //Ambil Dosen PA dari mahasiswa
         User dosenPa = mahasiswa.getDosenPa();
 
-        // 2. Validasi jika mahasiswa sudah punya PA
+        //Validasi jika mahasiswa sudah punya PA
         if (dosenPa == null) {
             throw new BadRequestException("Anda belum memiliki Dosen PA. Hubungi Admin.");
         }
 
-        // 3. Cari jadwal berdasarkan ID Dosen PA, bukan ID mahasiswa
-        return scheduleRepository.findByDosenIdAndAvailableTrue(dosenPa.getId());
+        //Cari jadwal berdasarkan ID Dosen PA, bukan ID mahasiswa
+        List<Schedule> schedules = scheduleRepository.findByDosenIdAndAvailableTrue(dosenPa.getId());
+
+        //Mapping dari List<Schedule> ke List<ScheduleResponse>
+        return schedules.stream()
+                .map(this::mapToScheduleResponse)
+                .collect(Collectors.toList());
     }
 
-    public List<Schedule> getMySchedules(String username) {
+    @Transactional(readOnly = true)
+    public List<ScheduleResponse> getMySchedules(String username) {
         User dosen = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Dosen tidak ditemukan"));
 
-        return scheduleRepository.findByDosenId(dosen.getId());
+        List<Schedule> schedules = scheduleRepository.findByDosenId(dosen.getId());
+        return schedules.stream()
+                .map(this::mapToScheduleResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional
-    public Schedule updateSchedule(Long id, CreateScheduleRequest request) {
+    public ScheduleResponse updateSchedule(Long id, CreateScheduleRequest request) {
         Schedule schedule = scheduleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Jadwal tidak ditemukan"));
 
@@ -73,8 +86,10 @@ public class ScheduleService {
         schedule.setJamMulai(LocalTime.parse(request.getJamMulai()));
         schedule.setJamSelesai(LocalTime.parse(request.getJamSelesai()));
         schedule.setMaxSlot(request.getMaxSlot());
+        // Slot terisi tidak direset saat update
 
-        return scheduleRepository.save(schedule);
+        Schedule updatedSchedule = scheduleRepository.save(schedule);
+        return mapToScheduleResponse(updatedSchedule);
     }
 
     @Transactional
@@ -83,5 +98,25 @@ public class ScheduleService {
                 .orElseThrow(() -> new ResourceNotFoundException("Jadwal tidak ditemukan"));
 
         scheduleRepository.delete(schedule);
+    }
+
+    private ScheduleResponse mapToScheduleResponse(Schedule schedule) {
+        ScheduleResponse dto = new ScheduleResponse();
+        dto.setId(schedule.getId());
+        if (schedule.getDosen() != null) {
+            dto.setDosenId(schedule.getDosen().getId());
+            dto.setNamaDosen(schedule.getDosen().getNama());
+            dto.setEmailDosen(schedule.getDosen().getEmail());
+        }
+        dto.setHari(schedule.getHari());
+        dto.setHariIndonesia(schedule.getHari());
+        dto.setJamMulai(schedule.getJamMulai());
+        dto.setJamSelesai(schedule.getJamSelesai());
+        dto.setWaktuFromTimes(schedule.getJamMulai(), schedule.getJamSelesai());
+        dto.setMaxSlot(schedule.getMaxSlot());
+        dto.setSlotTerisi(schedule.getSlotTerisi());
+        dto.calculateSisaSlot();
+        dto.setAvailable(schedule.getAvailable());
+        return dto;
     }
 }

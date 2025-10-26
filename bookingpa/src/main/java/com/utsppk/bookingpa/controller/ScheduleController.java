@@ -1,8 +1,9 @@
 package com.utsppk.bookingpa.controller;
 
+// Import DTO yang relevan
 import com.utsppk.bookingpa.dto.request.CreateScheduleRequest;
 import com.utsppk.bookingpa.dto.response.ApiResponse;
-import com.utsppk.bookingpa.model.Schedule;
+import com.utsppk.bookingpa.dto.response.ScheduleResponse; // Import DTO Response
 import com.utsppk.bookingpa.service.ScheduleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -28,11 +29,11 @@ public class ScheduleController {
 
     @PostMapping("/create")
     @PreAuthorize("hasRole('DOSEN')")
-    @Operation(summary = "Buat jadwal konsultasi (Dosen)")
-    public ResponseEntity<ApiResponse<Schedule>> createSchedule(
+    @Operation(summary = "Membuat jadwal konsultasi (Dosen)")
+    public ResponseEntity<ApiResponse<ScheduleResponse>> createSchedule(
             Authentication authentication,
             @Valid @RequestBody CreateScheduleRequest request) {
-        Schedule schedule = scheduleService.createSchedule(authentication.getName(), request);
+        ScheduleResponse schedule = scheduleService.createSchedule(authentication.getName(), request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(new ApiResponse<>(true, "Jadwal berhasil dibuat", schedule));
@@ -40,33 +41,36 @@ public class ScheduleController {
 
     @GetMapping("/available")
     @PreAuthorize("hasRole('MAHASISWA')")
-    @Operation(summary = "Lihat jadwal tersedia (Mahasiswa)")
-    public ResponseEntity<ApiResponse<List<Schedule>>> getAvailableSchedules(Authentication authentication) {
-        List<Schedule> schedules = scheduleService.getAvailableSchedules(authentication.getName());
+    @Operation(summary = "Melihat jadwal tersedia (Mahasiswa)")
+    public ResponseEntity<ApiResponse<List<ScheduleResponse>>> getAvailableSchedules(Authentication authentication) {
+        List<ScheduleResponse> schedules = scheduleService.getAvailableSchedules(authentication.getName());
         return ResponseEntity.ok(new ApiResponse<>(true, "Jadwal tersedia", schedules));
     }
 
     @GetMapping("/my-schedules")
     @PreAuthorize("hasRole('DOSEN')")
-    @Operation(summary = "Lihat jadwal saya (Dosen)")
-    public ResponseEntity<ApiResponse<List<Schedule>>> getMySchedules(Authentication authentication) {
-        List<Schedule> schedules = scheduleService.getMySchedules(authentication.getName());
+    @Operation(summary = "Melihat jadwal saya (Dosen)")
+
+    public ResponseEntity<ApiResponse<List<ScheduleResponse>>> getMySchedules(Authentication authentication) {
+        List<ScheduleResponse> schedules = scheduleService.getMySchedules(authentication.getName());
         return ResponseEntity.ok(new ApiResponse<>(true, "Jadwal ditemukan", schedules));
     }
 
     @PutMapping("/update/{id}")
     @PreAuthorize("hasRole('DOSEN')")
-    @Operation(summary = "Update jadwal (Dosen)")
-    public ResponseEntity<ApiResponse<Schedule>> updateSchedule(
+    @Operation(summary = "Mengupdate jadwal (Dosen)")
+
+    public ResponseEntity<ApiResponse<ScheduleResponse>> updateSchedule(
             @PathVariable Long id,
             @Valid @RequestBody CreateScheduleRequest request) {
-        Schedule schedule = scheduleService.updateSchedule(id, request);
+
+        ScheduleResponse schedule = scheduleService.updateSchedule(id, request);
         return ResponseEntity.ok(new ApiResponse<>(true, "Jadwal berhasil diupdate", schedule));
     }
 
     @DeleteMapping("/delete/{id}")
     @PreAuthorize("hasRole('DOSEN')")
-    @Operation(summary = "Hapus jadwal (Dosen)")
+    @Operation(summary = "Menghapus jadwal (Dosen)")
     public ResponseEntity<ApiResponse<?>> deleteSchedule(@PathVariable Long id) {
         scheduleService.deleteSchedule(id);
         return ResponseEntity.ok(new ApiResponse<>(true, "Jadwal berhasil dihapus"));
