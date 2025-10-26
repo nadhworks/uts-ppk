@@ -15,4 +15,7 @@ public class UserResponse {
     private Role role;
     private Boolean active;
     private LocalDateTime createdAt;
+    private Long dosenPaId;
+    private String namaDosenPa;
+
 }

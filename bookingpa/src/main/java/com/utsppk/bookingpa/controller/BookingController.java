@@ -69,4 +69,14 @@ public class BookingController {
         Booking booking = bookingService.rejectBooking(id);
         return ResponseEntity.ok(new ApiResponse<>(true, "Permintaan konsultasi akademik berhasil ditolak", booking));
     }
+
+    @DeleteMapping("/delete/{id}")
+    @PreAuthorize("hasRole('MAHASISWA')")
+    @Operation(summary = "Hapus/Batalkan permintaan konsultasi yang belum disetujui dosen (Mahasiswa)")
+    public ResponseEntity<ApiResponse<?>> deletePendingBooking(
+            Authentication authentication,
+            @PathVariable Long id) {
+        bookingService.deletePendingBooking(authentication.getName(), id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Permintaan konsultasi berhasil dihapus"));
+    }
 }

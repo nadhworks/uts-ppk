@@ -1,5 +1,6 @@
 package com.utsppk.bookingpa.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -39,6 +40,11 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dosen_pa_id", nullable = true) // Kolom ini boleh null (untuk Dosen/Admin)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private User dosenPa;
 
     @Column(nullable = false)
     private Boolean active = true;

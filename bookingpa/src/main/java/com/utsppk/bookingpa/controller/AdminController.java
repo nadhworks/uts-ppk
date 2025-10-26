@@ -2,6 +2,8 @@ package com.utsppk.bookingpa.controller;
 
 import com.utsppk.bookingpa.dto.response.ApiResponse;
 import com.utsppk.bookingpa.dto.response.UserResponse;
+import com.utsppk.bookingpa.exception.BadRequestException;
+import com.utsppk.bookingpa.exception.ResourceNotFoundException;
 import com.utsppk.bookingpa.model.Role;
 import com.utsppk.bookingpa.model.User;
 import com.utsppk.bookingpa.repository.UserRepository;
@@ -11,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -49,8 +52,44 @@ public class AdminController {
     @DeleteMapping("/users/{id}")
     @Operation(summary = "Hapus pengguna (Admin)")
     public ResponseEntity<ApiResponse<?>> deleteUser(@PathVariable Long id) {
+        // periksa apakah user ada
+        if (!userRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Pengguna dengan ID " + id + " tidak ditemukan");
+        }
         userRepository.deleteById(id);
         return ResponseEntity.ok(new ApiResponse<>(true, "Pengguna berhasil dihapus"));
+    }
+
+    @Transactional
+    @PatchMapping("/assign-pa/{mahasiswaId}/{dosenId}")
+    @Operation(summary = "Tetapkan Dosen PA ke Mahasiswa (Admin)")
+    public ResponseEntity<ApiResponse<UserResponse>> assignPaToMahasiswa(
+            @PathVariable Long mahasiswaId,
+            @PathVariable Long dosenId) {
+
+        User mahasiswa = userRepository.findById(mahasiswaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Mahasiswa dengan ID " + mahasiswaId + " tidak ditemukan"));
+
+        User dosen = userRepository.findById(dosenId)
+                .orElseThrow(() -> new ResourceNotFoundException("Dosen dengan ID " + dosenId + " tidak ditemukan"));
+
+        // Validasi peran
+        if (mahasiswa.getRole() != Role.MAHASISWA) {
+            throw new BadRequestException("User yang dipilih (ID: " + mahasiswaId + ") bukan MAHASISWA");
+        }
+        if (dosen.getRole() != Role.DOSEN) {
+            throw new BadRequestException("User yang dipilih untuk PA (ID: " + dosenId + ") bukan DOSEN");
+        }
+
+        // Tetapkan Dosen PA
+        mahasiswa.setDosenPa(dosen);
+        User updatedMahasiswa = userRepository.save(mahasiswa);
+
+        return ResponseEntity.ok(new ApiResponse<>(
+                true,
+                "Dosen PA " + dosen.getNama() + " berhasil ditetapkan ke " + mahasiswa.getNama(),
+                mapToUserResponse(updatedMahasiswa)
+        ));
     }
 
     private UserResponse mapToUserResponse(User user) {
@@ -64,6 +103,12 @@ public class AdminController {
         response.setRole(user.getRole());
         response.setActive(user.getActive());
         response.setCreatedAt(user.getCreatedAt());
+
+        if (user.getDosenPa() != null) {
+            response.setDosenPaId(user.getDosenPa().getId());
+            response.setNamaDosenPa(user.getDosenPa().getNama());
+        }
+
         return response;
     }
 }

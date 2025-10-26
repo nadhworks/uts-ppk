@@ -3,6 +3,7 @@ package com.utsppk.bookingpa.service;
 import com.utsppk.bookingpa.dto.request.CreateBookingRequest;
 import com.utsppk.bookingpa.exception.BadRequestException;
 import com.utsppk.bookingpa.exception.ResourceNotFoundException;
+import com.utsppk.bookingpa.exception.UnauthorizedException;
 import com.utsppk.bookingpa.model.Booking;
 import com.utsppk.bookingpa.model.Schedule;
 import com.utsppk.bookingpa.model.User;
@@ -102,5 +103,24 @@ public class BookingService {
 
         booking.setStatus(Booking.BookingStatus.REJECTED);
         return bookingRepository.save(booking);
+    }
+
+    @Transactional
+    public void deletePendingBooking(String username, Long id) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking tidak ditemukan"));
+
+        // Validasi 1: Pastikan ini milik mahasiswa yang login
+        if (!booking.getMahasiswa().getUsername().equals(username)) {
+            throw new UnauthorizedException("Anda tidak memiliki izin untuk menghapus booking ini");
+        }
+
+        // Validasi 2: Pastikan statusnya PENDING
+        if (booking.getStatus() != Booking.BookingStatus.PENDING) {
+            throw new BadRequestException("Hanya permintaan yang PENDING yang bisa dihapus. Status saat ini: " + booking.getStatus());
+        }
+
+        // Langsung hapus. Tidak perlu logika slot.
+        bookingRepository.delete(booking);
     }
 }

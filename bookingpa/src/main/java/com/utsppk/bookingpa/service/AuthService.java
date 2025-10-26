@@ -114,6 +114,12 @@ public class AuthService {
         response.setRole(user.getRole());
         response.setActive(user.getActive());
         response.setCreatedAt(user.getCreatedAt());
+
+        if (user.getDosenPa() != null) {
+            response.setDosenPaId(user.getDosenPa().getId());
+            response.setNamaDosenPa(user.getDosenPa().getNama());
+        }
+
         return response;
     }
 }

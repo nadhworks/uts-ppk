@@ -45,9 +45,16 @@ public class ScheduleService {
         User mahasiswa = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Mahasiswa tidak ditemukan"));
 
-        // Asumsi: mahasiswa melihat jadwal dosen PA-nya
-        // Untuk simplifikasi, tampilkan semua jadwal available
-        return scheduleRepository.findByDosenIdAndAvailableTrue(mahasiswa.getId());
+        // 1. Ambil Dosen PA dari mahasiswa
+        User dosenPa = mahasiswa.getDosenPa();
+
+        // 2. Validasi jika mahasiswa sudah punya PA
+        if (dosenPa == null) {
+            throw new BadRequestException("Anda belum memiliki Dosen PA. Hubungi Admin.");
+        }
+
+        // 3. Cari jadwal berdasarkan ID Dosen PA, bukan ID mahasiswa
+        return scheduleRepository.findByDosenIdAndAvailableTrue(dosenPa.getId());
     }
 
     public List<Schedule> getMySchedules(String username) {
